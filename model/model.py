@@ -59,12 +59,12 @@ class BangladeshModel(Model):
 
     def __init__(
         self,
+        breakdown_probabilities,
         seed=None,
         x_max=500,
         y_max=500,
         x_min=0,
         y_min=0,
-        breakdown_probabilities=[0, 0, 0, 0.05],
     ):
 
         self.schedule = BaseScheduler(self)
