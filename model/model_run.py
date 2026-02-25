@@ -10,12 +10,26 @@ from model import BangladeshModel
 # run time 5 x 24 hours; 1 tick 1 minute
 # run_length = 5 * 24 * 60
 
+BREAKDOWN_PROBABILITIES = [
+    [0, 0, 0, 0.05],
+    [0, 0, 0, 0.1],
+    [0, 0, 0.05, 0.1],
+    [0, 0, 0.1, 0.2],
+    [0, 0.05, 0.1, 0.2],
+    [0, 0.1, 0.2, 0.4],
+    [0.05, 0.1, 0.2, 0.4],
+    [0.1, 0.2, 0.4, 0.8],
+]
+
+
 # run time 1000 ticks
 run_length = 1000
 
 seed = 1234567
 
-sim_model = BangladeshModel(seed=seed)
+sim_model = BangladeshModel(
+    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[-1]
+)
 
 # Check if the seed is set
 print("SEED " + str(sim_model._seed))
