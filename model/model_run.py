@@ -28,7 +28,7 @@ run_length = 1000
 seed = 1234567
 
 sim_model = BangladeshModel(
-    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[0]
+    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[-1]
 )
 
 # Check if the seed is set

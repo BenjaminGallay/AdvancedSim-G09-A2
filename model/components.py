@@ -58,25 +58,25 @@ class Bridge(Infra):
         length=0,
         name="Unknown",
         road_name="Unknown",
-        condition=0,
+        condition=3,
     ):
         super().__init__(unique_id, model, length, name, road_name)
 
         self.condition = condition
-
-        self.delay_time = 0
-        if self.random.random() < breakdown_probabilities[condition]:
-            if length < 10:
-                self.delay_time = self.random.randrange(10, 20)
-            elif length < 50:
-                self.delay_time = self.random.randrange(15, 60)
-            elif length < 200:
-                self.delay_time = self.random.randrange(45, 90)
-            else:
-                self.delay_time = self.random.triangular(60, 120, 240)
+        self.breakdown_probabilities = breakdown_probabilities
 
     def get_delay_time(self):
-        return self.delay_time
+        delay_time = 0
+        if self.random.random() < self.breakdown_probabilities[self.condition]:
+            if self.length < 10:
+                delay_time = self.random.randrange(10, 20)
+            elif self.length < 50:
+                delay_time = self.random.randrange(15, 60)
+            elif self.length < 200:
+                delay_time = self.random.randrange(45, 90)
+            else:
+                delay_time = self.random.triangular(60, 120, 240)
+        return delay_time
 
 
 # ---------------------------------------------------------------
@@ -315,6 +315,7 @@ class Vehicle(Agent):
                 # arrive at the bridge and wait
                 self.arrive_at_next(next_infra, 0)
                 self.state = Vehicle.State.WAIT
+                print("I'm waiting for", self.waiting_time)
                 return
             # else, continue driving
 
