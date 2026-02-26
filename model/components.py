@@ -69,11 +69,11 @@ class Bridge(Infra):
         delay_time = 0
         if self.random.random() < self.breakdown_probabilities[self.condition]:
             if self.length < 10:
-                delay_time = self.random.randrange(10, 20)
+                delay_time = self.random.uniform(10, 20)
             elif self.length < 50:
-                delay_time = self.random.randrange(15, 60)
+                delay_time = self.random.uniform(15, 60)
             elif self.length < 200:
-                delay_time = self.random.randrange(45, 90)
+                delay_time = self.random.uniform(45, 90)
             else:
                 delay_time = self.random.triangular(60, 120, 240)
         return delay_time
