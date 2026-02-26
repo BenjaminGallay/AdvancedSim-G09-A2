@@ -234,6 +234,7 @@ class Vehicle(Agent):
         self.waited_at = None
         self.removed_at_step = None
 
+    # what is printed when print(self) is called
     def __str__(self):
         return (
             "Vehicle"
