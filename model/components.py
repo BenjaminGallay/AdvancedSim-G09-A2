@@ -1,5 +1,6 @@
-from mesa import Agent
 from enum import Enum
+
+from mesa import Agent
 
 
 # ---------------------------------------------------------------
@@ -19,8 +20,7 @@ class Infra(Agent):
 
     """
 
-    def __init__(self, unique_id, model, length=0,
-                 name='Unknown', road_name='Unknown'):
+    def __init__(self, unique_id, model, length=0, name="Unknown", road_name="Unknown"):
         super().__init__(unique_id, model)
         self.length = length
         self.name = name
@@ -50,19 +50,33 @@ class Bridge(Infra):
 
     """
 
-    def __init__(self, unique_id, model, length=0,
-                 name='Unknown', road_name='Unknown', condition='Unknown'):
+    def __init__(
+        self,
+        unique_id,
+        model,
+        breakdown_probabilities,
+        length=0,
+        name="Unknown",
+        road_name="Unknown",
+        condition=3,
+    ):
         super().__init__(unique_id, model, length, name, road_name)
 
         self.condition = condition
+        self.breakdown_probabilities = breakdown_probabilities
 
-        # TODO
-        self.delay_time = self.random.randrange(0, 10)
-        # print(self.delay_time)
-
-    # TODO
     def get_delay_time(self):
-        return self.delay_time
+        delay_time = 0
+        if self.random.random() < self.breakdown_probabilities[self.condition]:
+            if self.length < 10:
+                delay_time = self.random.uniform(10, 20)
+            elif self.length < 50:
+                delay_time = self.random.uniform(15, 60)
+            elif self.length < 200:
+                delay_time = self.random.uniform(45, 90)
+            else:
+                delay_time = self.random.triangular(60, 120, 240)
+        return delay_time
 
 
 # ---------------------------------------------------------------
@@ -82,15 +96,17 @@ class Sink(Infra):
     ...
 
     """
+
     vehicle_removed_toggle = False
 
     def remove(self, vehicle):
         self.model.schedule.remove(vehicle)
         self.vehicle_removed_toggle = not self.vehicle_removed_toggle
-        print(str(self) + ' REMOVE ' + str(vehicle))
+        print(str(self) + " REMOVE " + str(vehicle))
 
 
 # ---------------------------------------------------------------
+
 
 class Source(Infra):
     """
@@ -127,7 +143,7 @@ class Source(Infra):
         Generates a truck, sets its path, increases the global and local counters
         """
         try:
-            agent = Vehicle('Truck' + str(Source.truck_counter), self.model, self)
+            agent = Vehicle("Truck" + str(Source.truck_counter), self.model, self)
             if agent:
                 self.model.schedule.add(agent)
                 agent.set_path()
@@ -144,6 +160,7 @@ class SourceSink(Source, Sink):
     """
     Generates and removes trucks
     """
+
     pass
 
 
@@ -200,8 +217,9 @@ class Vehicle(Agent):
         DRIVE = 1
         WAIT = 2
 
-    def __init__(self, unique_id, model, generated_by,
-                 location_offset=0, path_ids=None):
+    def __init__(
+        self, unique_id, model, generated_by, location_offset=0, path_ids=None
+    ):
         super().__init__(unique_id, model)
         self.generated_by = generated_by
         self.generated_at_step = model.schedule.steps
@@ -216,11 +234,26 @@ class Vehicle(Agent):
         self.waited_at = None
         self.removed_at_step = None
 
+    # what is printed when print(self) is called
     def __str__(self):
-        return "Vehicle" + str(self.unique_id) + \
-               " +" + str(self.generated_at_step) + " -" + str(self.removed_at_step) + \
-               " " + str(self.state) + '(' + str(self.waiting_time) + ') ' + \
-               str(self.location) + '(' + str(self.location.vehicle_count) + ') ' + str(self.location_offset)
+        return (
+            "Vehicle"
+            + str(self.unique_id)
+            + " +"
+            + str(self.generated_at_step)
+            + " -"
+            + str(self.removed_at_step)
+            + " "
+            + str(self.state)
+            + "("
+            + str(self.waiting_time)
+            + ") "
+            + str(self.location)
+            + "("
+            + str(self.location.vehicle_count)
+            + ") "
+            + str(self.location_offset)
+        )
 
     def set_path(self):
         """
@@ -267,7 +300,9 @@ class Vehicle(Agent):
 
         self.location_index += 1
         next_id = self.path_ids[self.location_index]
-        next_infra = self.model.schedule._agents[next_id]  # Access to protected member _agents
+        next_infra = self.model.schedule._agents[
+            next_id
+        ]  # Access to protected member _agents
 
         if isinstance(next_infra, Sink):
             # arrive at the sink
@@ -281,6 +316,7 @@ class Vehicle(Agent):
                 # arrive at the bridge and wait
                 self.arrive_at_next(next_infra, 0)
                 self.state = Vehicle.State.WAIT
+                print("I'm waiting for", self.waiting_time)
                 return
             # else, continue driving
 
@@ -300,6 +336,5 @@ class Vehicle(Agent):
         self.location_offset = location_offset
         self.location.vehicle_count += 1
 
+
 # EOF -----------------------------------------------------------
-
-
