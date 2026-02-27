@@ -25,12 +25,12 @@ BREAKDOWN_PROBABILITIES = [
 
 
 # run time 1000 ticks
-run_length = 1000
+run_length = 10000
 
 seed = 1234567
 
 sim_model = BangladeshModel(
-    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[-1]
+    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[0]
 )
 
 # Check if the seed is set

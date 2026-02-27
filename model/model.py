@@ -87,7 +87,7 @@ class BangladeshModel(Model):
         BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
         # Input paths
-        df = pd.read_csv(os.path.join(BASE_DIR, "data", "demo-1.csv"))
+        df = pd.read_csv(os.path.join(BASE_DIR, "data", "roadN1.csv"))
 
         # a list of names of roads to be generated
         roads = ["N1"]
