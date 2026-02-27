@@ -1,3 +1,5 @@
+import recorder
+
 from model import BangladeshModel
 
 """
@@ -37,3 +39,4 @@ print("SEED " + str(sim_model._seed))
 # One run with given steps
 for i in range(run_length):
     sim_model.step()
+recorder.write_to_file()

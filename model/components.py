@@ -1,5 +1,6 @@
 from enum import Enum
 
+import recorder
 from mesa import Agent
 
 
@@ -76,7 +77,7 @@ class Bridge(Infra):
                 delay_time = self.random.uniform(45, 90)
             else:
                 delay_time = self.random.triangular(60, 120, 240)
-        return delay_time
+        return int(delay_time)
 
 
 # ---------------------------------------------------------------
@@ -277,7 +278,7 @@ class Vehicle(Agent):
         """
         To print the vehicle trajectory at each step
         """
-        print(self)
+        # print(self)
 
     def drive(self):
 
@@ -285,6 +286,11 @@ class Vehicle(Agent):
         # speed is global now: can change to instance object when individual speed is needed
         distance = Vehicle.speed * Vehicle.step_time
         distance_rest = self.location_offset + distance - self.location.length
+        # location offset is the distance the vehicle is at from the start of the location it is in. distance_rest is how much the vehicle exceeds the end of the location if it drives for the whole step. If it is positive, the vehicle can reach the next location in this step, otherwise it continues to drive on the current location for the whole step.
+
+        # print(
+        #     "debug", self.location_offset, distance, self.location.length, distance_rest
+        # )
 
         if distance_rest > 0:
             # go to the next object
@@ -309,6 +315,9 @@ class Vehicle(Agent):
             self.arrive_at_next(next_infra, 0)
             self.removed_at_step = self.model.schedule.steps
             self.location.remove(self)
+            recorder.truck_record(
+                self.unique_id, self.generated_at_step, self.removed_at_step
+            )
             return
         elif isinstance(next_infra, Bridge):
             self.waiting_time = next_infra.get_delay_time()
@@ -316,7 +325,7 @@ class Vehicle(Agent):
                 # arrive at the bridge and wait
                 self.arrive_at_next(next_infra, 0)
                 self.state = Vehicle.State.WAIT
-                print("I'm waiting for", self.waiting_time)
+                # print("I'm waiting for", self.waiting_time)
                 return
             # else, continue driving
 
