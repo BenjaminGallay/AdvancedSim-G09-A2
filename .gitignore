@@ -2,3 +2,4 @@
 /model/ContinuousSpace/__pycache__
 /img/
 /data/.*
+*.pyc
