@@ -56,10 +56,10 @@ class Bridge(Infra):
         unique_id,
         model,
         breakdown_probabilities,
-        length=0,
-        name="Unknown",
-        road_name="Unknown",
-        condition=3,
+        condition,
+        length,
+        name,
+        road_name,
     ):
         super().__init__(unique_id, model, length, name, road_name)
 
@@ -103,7 +103,7 @@ class Sink(Infra):
     def remove(self, vehicle):
         self.model.schedule.remove(vehicle)
         self.vehicle_removed_toggle = not self.vehicle_removed_toggle
-        print(str(self) + " REMOVE " + str(vehicle))
+        # print(str(self) + " REMOVE " + str(vehicle))
 
 
 # ---------------------------------------------------------------
@@ -151,7 +151,7 @@ class Source(Infra):
                 Source.truck_counter += 1
                 self.vehicle_count += 1
                 self.vehicle_generated_flag = True
-                print(str(self) + " GENERATE " + str(agent))
+                # print(str(self) + " GENERATE " + str(agent))
         except Exception as e:
             print("Oops!", e.__class__, "occurred.")
 

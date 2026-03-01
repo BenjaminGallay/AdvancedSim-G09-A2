@@ -1,3 +1,6 @@
+import statistics
+
+import matplotlib.pyplot as plt
 import recorder
 
 from model import BangladeshModel
@@ -13,6 +16,7 @@ from model import BangladeshModel
 # run_length = 5 * 24 * 60
 
 BREAKDOWN_PROBABILITIES = [
+    [0, 0, 0, 0],
     [0, 0, 0, 0.05],
     [0, 0, 0, 0.1],
     [0, 0, 0.05, 0.1],
@@ -23,20 +27,27 @@ BREAKDOWN_PROBABILITIES = [
     [0.1, 0.2, 0.4, 0.8],
 ]
 
+# scenario 0 = no bridges breaking down : baseline travel time. scenario 8 = most likely breakdowns
+scenario = 4
 
-# run time 1000 ticks
-run_length = 10000
+# run time 7200 ticks = 5*24h runtime
+run_length = 7200
+number_of_seeds = 10
+seeds = range(100, 100 + number_of_seeds)
 
-seed = 1234567
 
-sim_model = BangladeshModel(
-    seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[0]
-)
+for seed in seeds:
+    sim_model = BangladeshModel(
+        seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[scenario]
+    )
 
-# Check if the seed is set
-print("SEED " + str(sim_model._seed))
+    # Check if the seed is set
+    print("SEED " + str(sim_model._seed))
 
-# One run with given steps
-for i in range(run_length):
-    sim_model.step()
-recorder.write_to_file()
+    # One run with given steps
+    for i in range(run_length):
+        sim_model.step()
+ids, travel_times, frequencies = recorder.write_to_file_and_return(scenario)
+print("average travel time for scenario", scenario, " :", statistics.mean(travel_times))
+plt.plot(range(2000), frequencies)
+plt.show()

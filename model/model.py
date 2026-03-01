@@ -154,6 +154,7 @@ class BangladeshModel(Model):
                         row["id"],
                         self,
                         self.breakdown_probabilities,
+                        int(row["condition"]),
                         row["length"],
                         row["name"],
                         row["road"],
