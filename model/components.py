@@ -77,7 +77,7 @@ class Bridge(Infra):
                 delay_time = self.random.uniform(45, 90)
             else:
                 delay_time = self.random.triangular(60, 120, 240)
-            recorder.bridge_record(self.unique_id % 1000000, delay_time)
+            recorder.bridge_record(self.unique_id % 1000000, int(delay_time))
         return int(delay_time)
 
 

@@ -10,6 +10,14 @@ frequencies = [0 for i in range(2000)]
 bridge_waited_time = [0 for i in range(125)]
 
 
+def reset_times():
+    global ids
+    ids = []
+    global travel_times
+    travel_times = []
+    return
+
+
 def truck_record(id, generated_at, removed_at):
     travel_time = removed_at - generated_at
     ids.append(id)

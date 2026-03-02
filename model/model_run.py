@@ -36,6 +36,7 @@ seeds = range(100, 100 + number_of_seeds)
 
 # Loop through all scenarios
 for scenario in range(len(BREAKDOWN_PROBABILITIES)):
+    recorder.reset_times()
     print(f"\n--- Running scenario {scenario} ---")
 
     for seed in seeds:
