@@ -7,6 +7,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 ids = []
 travel_times = []
 frequencies = [0 for i in range(2000)]
+bridge_waited_time = [0 for i in range(125)]
 
 
 def truck_record(id, generated_at, removed_at):
@@ -16,6 +17,15 @@ def truck_record(id, generated_at, removed_at):
     travel_times.append(travel_time)
     # print("travel_time", travel_time, id)
     return
+
+
+def bridge_record(number, time_waited):
+    bridge_waited_time[number] += time_waited
+    return
+
+
+def get_bridge_waited_time():
+    return bridge_waited_time
 
 
 def write_to_file_and_return(scenario):
