@@ -22,7 +22,7 @@ def truck_record(id, generated_at, removed_at):
     travel_time = removed_at - generated_at
     ids.append(id)
     frequencies[travel_time] += 1
-    travel_times.append(travel_time)
+    travel_times.append(int(travel_time))
     # print("travel_time", travel_time, id)
     return
 
