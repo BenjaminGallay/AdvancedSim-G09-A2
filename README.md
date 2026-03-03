@@ -12,3 +12,13 @@ This assignment focuses on the simulation of road traffic on the main roads of B
 - the ```/experiment/``` folder contains the output data of the simulation. Each .csv file contains the travel time and the id of every truck that reached the sink at the end of the road, in Dhaka.
 - the ```/model/``` folder contains the code relative to the simulation and the display in the browser. More information in the ```/model/README.md``` file
 - the ```/report/``` folder contains the report
+
+## Dependencies 
+
+- Mesa 2.1.4
+- Pandas
+- Numpy
+
+## How to run ?
+
+Simply execute ```$ python /model/model_run.py``` and follow the instructions in the console. More information about the code can be found in the README in each folder.
