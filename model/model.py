@@ -1,6 +1,7 @@
 import os
 from collections import defaultdict
 
+import analytical_recorder
 import pandas as pd
 from components import Bridge, Link, Sink, Source, SourceSink
 from mesa import Model
@@ -87,7 +88,7 @@ class BangladeshModel(Model):
         BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
         # Input paths
-        df = pd.read_csv(os.path.join(BASE_DIR, "data", "roadN1.csv"))
+        df = pd.read_csv(os.path.join(BASE_DIR, "data", "N1road.csv"))
 
         # a list of names of roads to be generated
         roads = ["N1"]
@@ -129,6 +130,7 @@ class BangladeshModel(Model):
 
         for df in df_objects_all:
             for _, row in df.iterrows():  # index, row in ...
+                analytical_recorder.road_length_record(row["length"])
                 # create agents according to model_type
                 model_type = row["model_type"]
                 agent = None
@@ -150,6 +152,23 @@ class BangladeshModel(Model):
                     self.sources.append(agent.unique_id)
                     self.sinks.append(agent.unique_id)
                 elif model_type == "bridge":
+                    # computes the mean travel time analytically
+                    if row["length"] < 10:
+                        mean_delay = 15
+                    elif row["length"] < 50:
+                        mean_delay = 37.5
+                    elif row["length"] < 200:
+                        mean_delay = 67.5
+                    else:
+                        mean_delay = (
+                            (7 / 3) * 60
+                        )  # expected value of the triangular distribution of probability
+                    delay_probability = self.breakdown_probabilities[
+                        int(row["condition"])
+                    ]
+                    analytical_recorder.bridge_delay_record(
+                        mean_delay * delay_probability
+                    )
                     agent = Bridge(
                         row["id"],
                         self,
