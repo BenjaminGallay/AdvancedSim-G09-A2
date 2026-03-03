@@ -1,6 +1,6 @@
 from enum import Enum
 
-import recorder
+import statistical_recorder
 from mesa import Agent
 
 
@@ -77,7 +77,9 @@ class Bridge(Infra):
                 delay_time = self.random.uniform(45, 90)
             else:
                 delay_time = self.random.triangular(60, 120, 240)
-            recorder.bridge_record(self.unique_id % 1000000, int(delay_time))
+            statistical_recorder.bridge_record(
+                self.unique_id % 1000000, int(delay_time)
+            )
         return int(delay_time)
 
 
@@ -316,7 +318,7 @@ class Vehicle(Agent):
             self.arrive_at_next(next_infra, 0)
             self.removed_at_step = self.model.schedule.steps
             self.location.remove(self)
-            recorder.truck_record(
+            statistical_recorder.truck_record(
                 self.unique_id, self.generated_at_step, self.removed_at_step
             )
             return

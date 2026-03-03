@@ -2,9 +2,9 @@ import statistics
 
 import matplotlib.pyplot as plt
 import numpy
-import recorder
+import statistical_recorder
 
-from model import BangladeshModel
+from model import BangladeshModel, analytical_recorder
 
 """
     Run simulation
@@ -72,10 +72,11 @@ def get_choice():
 scenarios, bonus = get_choice()
 # Loop through all scenarios
 for scenario in scenarios:
-    recorder.reset_times()
+    statistical_recorder.reset_times()
     print(f"\n--- Running scenario {scenario} ---")
 
     for seed in seeds:
+        analytical_recorder.reset()
         sim_model = BangladeshModel(
             seed=seed, breakdown_probabilities=BREAKDOWN_PROBABILITIES[scenario]
         )
@@ -87,12 +88,23 @@ for scenario in scenarios:
         for i in range(run_length):
             sim_model.step()
 
-    ids, travel_times, frequencies = recorder.write_to_file_and_return(scenario)
+    ids, travel_times, frequencies = statistical_recorder.write_to_file_and_return(
+        scenario
+    )
     print(
-        "average travel time for scenario", scenario, ":", statistics.mean(travel_times)
+        "statistical average travel time for scenario",
+        scenario,
+        ":",
+        statistics.mean(travel_times),
+    )
+    print(
+        "analytical expected travel time for scenario",
+        scenario,
+        ":",
+        analytical_recorder.get_expected_mean_travel_time(),
     )
     if scenario == 7 and bonus:
-        bridge_waited_time = recorder.get_bridge_waited_time()
+        bridge_waited_time = statistical_recorder.get_bridge_waited_time()
         worst_indexes = numpy.argsort(bridge_waited_time)[::-1][:5]
         waited_times = [bridge_waited_time[i] for i in worst_indexes]
         print(
