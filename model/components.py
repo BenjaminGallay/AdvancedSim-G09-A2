@@ -67,6 +67,7 @@ class Bridge(Infra):
         self.breakdown_probabilities = breakdown_probabilities
 
     def get_delay_time(self):
+        # computes the delay time according to the formula given in the assignment
         delay_time = 0
         if self.random.random() < self.breakdown_probabilities[self.condition]:
             if self.length < 10:
@@ -77,6 +78,7 @@ class Bridge(Infra):
                 delay_time = self.random.uniform(45, 90)
             else:
                 delay_time = self.random.triangular(60, 120, 240)
+            # sends the information about the delay at the bridge to build the bridges total delay ranking
             statistical_recorder.bridge_record(
                 self.unique_id % 1000000, int(delay_time)
             )
@@ -318,6 +320,7 @@ class Vehicle(Agent):
             self.arrive_at_next(next_infra, 0)
             self.removed_at_step = self.model.schedule.steps
             self.location.remove(self)
+            # sends truck data to the statistical recorder to compute the average travel time
             statistical_recorder.truck_record(
                 self.unique_id, self.generated_at_step, self.removed_at_step
             )
