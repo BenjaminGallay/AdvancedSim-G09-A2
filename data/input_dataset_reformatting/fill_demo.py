@@ -6,8 +6,8 @@ import preprocess_bmms
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-roads_csv = os.path.join(BASE_DIR, "data", "cleaned_dataset", "_roads3.csv")
-bmms_xlsx = os.path.join(BASE_DIR, "data", "cleaned_dataset", "BMMS_overview.xlsx")
+roads_csv = os.path.join(BASE_DIR, "data", "input_dataset_reformatting", "_roads3.csv")
+bmms_xlsx = os.path.join(BASE_DIR, "data", "input_dataset_reformatting", "BMMS_overview.xlsx")
 out_csv = os.path.join(BASE_DIR, "data", "roadN1.csv")
 
 def bmms_backfill(bmms_sub, df):
