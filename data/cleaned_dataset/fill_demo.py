@@ -1,254 +1,289 @@
 import os
-import xlsx_tools
 import numpy as np
 import pandas as pd
+import xlsx_tools
+import preprocess_bmms
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 roads_csv = os.path.join(BASE_DIR, "data", "cleaned_dataset", "_roads3.csv")
 bmms_xlsx = os.path.join(BASE_DIR, "data", "cleaned_dataset", "BMMS_overview.xlsx")
 out_csv = os.path.join(BASE_DIR, "data", "roadN1.csv")
-MERGE_CONSECUTIVE_LINKS = True
-
-
-def bmms_aggregate(bmms):
-    """Deduplicate / aggregate BMMS so there is one row per (road, lrp).
-
-    Uses median for numeric `length` and median of mapped condition codes.
-    """
-    # ensure length is numeric for median
-    bmms = bmms.copy()
-    bmms["length"] = pd.to_numeric(bmms["length"], errors="coerce")
-
-    # translate textual conditions to numeric codes for median aggregation
-    cond_map = {"A": 0, "B": 1, "C": 2, "D": 3}
-    bmms["condition_code"] = bmms["condition"].astype(str).str.strip().str.upper().map(cond_map)
-
-    bmms_agg = (
-        bmms.groupby(["road", "lrp"], as_index=False)
-        .agg({"length": "median", "condition_code": "median"})
-    )
-
-    # round condition median to nearest integer and keep as nullable Int
-    bmms_agg["condition_bmms"] = bmms_agg["condition_code"].round().astype("Int64")
-    bmms_sub = bmms_agg.rename(columns={"length": "length_bmms"})
-    bmms_sub = bmms_sub[["road", "lrp", "length_bmms", "condition_bmms"]]
-
-    return bmms_sub
 
 def bmms_backfill(bmms_sub, df):
-    """Backfill missing BMMS info for a segment by checking the bmms_sub entry for the segment's `lrp_next`."""
-    if bmms_sub.empty:
-        return
+    bmms_next_map = {
+        "length_bmms": "length_bmms_next",
+        "condition_bmms": "condition_bmms_next",
+        "length_l_bmms": "length_l_bmms_next",
+        "length_r_bmms": "length_r_bmms_next",
+        "condition_l_bmms": "condition_l_bmms_next",
+        "condition_r_bmms": "condition_r_bmms_next",
+    }
 
-    # build lookup dicts keyed by (road, lrp)
-    _len_map = { (r, l): v for r, l, v in bmms_sub[["road", "lrp", "length_bmms"]].itertuples(index=False) }
-    _cond_map = { (r, l): v for r, l, v in bmms_sub[["road", "lrp", "condition_bmms"]].itertuples(index=False) }
+    # Create a column containing the next LRP for each row in df.
+    bmms_next = bmms_sub[["road", "LRPName", *bmms_next_map.keys()]].rename(
+        columns={"LRPName": "lrp_next", **bmms_next_map}
+    )
+    df_next = df.merge(bmms_next, on=["road", "lrp_next"], how="left", validate="many_to_one")
 
-    if "lrp_next" not in df.columns:
-        return
+    next_cols = list(bmms_next_map.values())
+    df[next_cols] = df_next[next_cols]
 
-    # fill length_bmms where missing using the bmms record for the segment's end LRP
-    mask_len = df["length_bmms"].isna() & df["lrp_next"].notna()
-    if mask_len.any():
-        df.loc[mask_len, "length_bmms"] = df.loc[mask_len].apply(
-            lambda r: _len_map.get((r["road"], r["lrp_next"])), axis=1
-        )
+    df[list(bmms_next_map.keys())] = df[list(bmms_next_map.keys())].combine_first(
+        df[next_cols].rename(columns={next_name: name for name, next_name in bmms_next_map.items()})
+    )
 
-    # fill condition_bmms where missing using the bmms record for the segment's end LRP
-    mask_cond = df["condition_bmms"].isna() & df["lrp_next"].notna()
-    if mask_cond.any():
-        df.loc[mask_cond, "condition_bmms"] = df.loc[mask_cond].apply(
-            lambda r: _cond_map.get((r["road"], r["lrp_next"])), axis=1
-        )
 
+
+######### Simple fills #########
 def fill_type(df):
-    
+    # Get the type of each segment by looking at the gap and gap_next columns.
     is_bridge = (df["gap"] == "BS") & (df["gap_next"] == "BE")
     is_ferry = (df["gap"] == "FS") & (df["gap_next"] == "FE")
+    
+    # By default, fill links.
     df["model_type"] = "link"
+
     df.loc[is_bridge, "model_type"] = "bridge"
     df.loc[is_ferry, "model_type"] = "ferry"
 
+
 def fill_length(df):
-    """Compute segment lengths, prefer BMMS length for bridges, fallback to chainage diff."""
-    # chainage is in km in the roads CSV; convert difference to meters
-    df["length_calc"] = (
-        pd.to_numeric(df["chainage_next"], errors="coerce") - pd.to_numeric(df["chainage"], errors="coerce")
-    ) * 1000.0
-    df["length"] = np.where(df["model_type"] == "bridge", df["length_bmms"], df["length_calc"])
-    invalid_bridge_mask = (df["model_type"] == "bridge") & df["length"].isna()
-    if invalid_bridge_mask.any():
-        # if length_bmms is missing for a bridge, fallback to chainage difference
-        df.loc[invalid_bridge_mask, "length"] = df.loc[invalid_bridge_mask, "length_calc"]
-        
+    # Calculate length from chainage, then override with BMMS length for bridges where available.
+    df["length_calc"] = (df["chainage_next"] - df["chainage"]) * 1000.0
+    # Check whether BMMS gives the length for the start or end LRP of the bridge.
+    bridge_length = df["length_bmms_next"].combine_first(df["length_bmms"])
+    df["length"] = np.where(df["model_type"] == "bridge", bridge_length, df["length_calc"])
+    fallback = (df["model_type"] == "bridge") & df["length"].isna()
+    if fallback.any():
+        df.loc[fallback, "length"] = df.loc[fallback, "length_calc"]
+
+
 def fill_condition(segments):
-    """Assign aggregated numeric condition codes to bridge segments; default 0 when missing."""
+    # For non-bridge segments, condition is not defined (NA). 
+    # For bridge segments, condition is taken from BMMS where available, with backfill from next segment. 
+    # If still missing, default to 0.
     segments["condition"] = pd.NA
     bridge_mask = segments["model_type"] == "bridge"
-    if "condition_bmms" in segments.columns:
-        # condition_bmms is nullable Int64 from aggregation; assign directly
-        segments.loc[bridge_mask, "condition"] = segments.loc[bridge_mask, "condition_bmms"].astype("Int64")
-    # if condition_bmms is missing, fill with 0
+    # Check whether BMMS gives the condition for the start or end LRP of the bridge.
+    bridge_condition = segments["condition_bmms_next"].combine_first(segments["condition_bmms"])
+    segments.loc[bridge_mask, "condition"] = bridge_condition.loc[bridge_mask]
     segments.loc[bridge_mask & segments["condition"].isna(), "condition"] = 0
+
+
+def fill_bridgedual(segments):
+    # For bridge segments, bridgedual is taken from BMMS where available, with backfill from next segment.
+    # For non-bridge segments, bridgedual is not defined (NA).
+    bridge_mask = segments["model_type"] == "bridge"
+    segments["bridgedual"] = segments["bridgedual"].combine_first(segments["bridgedual_bmms"])
+    # bridgedual applies only to bridge rows
+    segments.loc[~bridge_mask, "bridgedual"] = pd.NA
+
+
+def fill_side_metrics(segments):
+    # For dual bridges, fill left/right length and condition from BMMS where available
+    # If only one side is present in BMMS, mirror it to the other side. 
+    # For non-bridge or single bridges, these remain NA.
+    bridge_dual_mask = (segments["model_type"] == "bridge") & segments["bridgedual"].notna()
+
+    side_from_next = segments[["length_l_bmms_next", "length_r_bmms_next", "condition_l_bmms_next", "condition_r_bmms_next"]].rename(
+        columns={
+            "length_l_bmms_next": "lengthL",
+            "length_r_bmms_next": "lengthR",
+            "condition_l_bmms_next": "conditionL",
+            "condition_r_bmms_next": "conditionR",
+        }
+    )
+    side_from_current = segments[["length_l_bmms", "length_r_bmms", "condition_l_bmms", "condition_r_bmms"]].rename(
+        columns={
+            "length_l_bmms": "lengthL",
+            "length_r_bmms": "lengthR",
+            "condition_l_bmms": "conditionL",
+            "condition_r_bmms": "conditionR",
+        }
+    )
+
+    # If a value is available only from next, backfill it to current.
+    side_values = side_from_next.combine_first(side_from_current)
     
-        
-def build_segments(df_roads, df_bmms):
-    """Vectorized construction of segments between consecutive lrps per road.
+    segments[["lengthL", "lengthR", "conditionL", "conditionR"]] = side_values.where(bridge_dual_mask, pd.NA)
 
-    Returns a DataFrame with columns: road,id,model_type,name,lat,lon,length,condition
-    """
-    # ensure ordering within each road
-    df = df_roads.sort_values(["road", "chainage"]).reset_index(drop=True)
+    # If only one side exists in BMMS, mirror values to the other side.
+    segments.loc[bridge_dual_mask, "lengthL"] = segments.loc[bridge_dual_mask, "lengthL"].combine_first(segments.loc[bridge_dual_mask, "lengthR"])
+    segments.loc[bridge_dual_mask, "lengthR"] = segments.loc[bridge_dual_mask, "lengthR"].combine_first(segments.loc[bridge_dual_mask, "lengthL"])
+    segments.loc[bridge_dual_mask, "conditionL"] = segments.loc[bridge_dual_mask, "conditionL"].combine_first(segments.loc[bridge_dual_mask, "conditionR"])
+    segments.loc[bridge_dual_mask, "conditionR"] = segments.loc[bridge_dual_mask, "conditionR"].combine_first(segments.loc[bridge_dual_mask, "conditionL"])
+    
 
-    # next-row values per road
+def assign_numeric_ids(df_out):
+    group = df_out.groupby("road", sort=True)
+    road_number = group.ngroup() + 1
+    element_number = group.cumcount()
+    df_out["id"] = road_number * 1_000_000 + element_number
+    return df_out
+
+########### Main processing #########
+def build_segments(df_roads, bmms_sub):
+    # Build segment rows from consecutive road points.
+    # Each row represents one directed segment: (road, lrp) -> (road, lrp_next).
+    df = df_roads.sort_values(["road", "chainage"], kind="mergesort").reset_index(drop=True)
+
+    # 1) Compute next-point fields per road.
+    #    The last point of each road has no next point, so it cannot form a segment.
     df["lrp_next"] = df.groupby("road")["lrp"].shift(-1)
     df["chainage_next"] = df.groupby("road")["chainage"].shift(-1)
     df["gap_next"] = df.groupby("road")["gap"].shift(-1)
 
-    # normalize column names for both frames to make merge keys identical
-    roads = df.rename(columns=lambda c: c.strip().lower())
-    bmms = df_bmms.rename(columns=lambda c: c.strip().lower())
+    # 2) Join BMMS metadata on (road, current lrp), then backfill from next lrp.
+    #    This handles cases where BMMS data is recorded on the bridge end LRP.
+    df = df.merge(bmms_sub, left_on=["road", "lrp"], right_on=["road", "LRPName"], how="left", validate="many_to_one")
 
-    # accept either 'lrp' or 'lrpname' in BMMS and map to 'lrp'
-    if "lrpname" in bmms.columns and "lrp" not in bmms.columns:
-        bmms = bmms.rename(columns={"lrpname": "lrp"})
-
-    # require road/lrp/length, but make 'condition' optional (may be absent)
-    required = {"road", "lrp", "length"}
-    missing = required - set(bmms.columns)
-    if missing:
-        raise KeyError(f"BMMS file is missing required columns: {sorted(missing)}")
-
-    # if 'condition' is absent in the BMMS file, create it (will be aggregated as missing)
-    if "condition" not in bmms.columns:
-        bmms["condition"] = pd.NA
-
-    bmms_sub = bmms_aggregate(bmms)
-    # merge with validation to catch unexpected duplicates
-    df = roads.merge(bmms_sub, on=["road", "lrp"], how="left", validate="many_to_one")
-
-    # Some BMMS values (length/condition) may be recorded on the end LRP rather than the start LRP.
     bmms_backfill(bmms_sub, df)
-    # determine model types
-    fill_type(df)
-    # compute lengths: non-bridges use chainage difference; bridges use BMMS length
-    fill_length(df)
-    # only keep entries where a next lrp exists (segments between rows)    
-    segments = df[df["lrp_next"].notna()].copy()
-    # build ids
-    segments["id"] = segments["road"].astype(str) + "_" + segments["lrp"].astype(str) + "_" + segments["lrp_next"].astype(str)
 
-    # use aggregated numeric condition codes from BMMS (median) for bridges
+    # 3) Derive core segment properties.
+    #    - type from gap pattern
+    #    - length from chainage (or BMMS for bridges)
+    fill_type(df)
+    fill_length(df)
+
+    # 4) Keep only rows with a valid next point (= valid segment starts).
+    segments = df[df["lrp_next"].notna()].copy()
+    segments["id"] = segments["road"] + "_" + segments["lrp"] + "_" + segments["lrp_next"]
+
+    # 5) Fill bridge-only fields.
     fill_condition(segments)
-    
-    # select and order columns for output
-    # keep lrp fields for possible post-processing (merging consecutive links)
-    out = segments[["road", "id", "model_type", "name", "lat", "lon", "length", "condition", "lrp", "lrp_next"]].copy()
-    return out
+    fill_bridgedual(segments)
+    fill_side_metrics(segments)
+
+    segments["_chainage_order"] = segments["chainage"]
+
+    return segments[["road","id","model_type","name","lat","lon","length","condition","lengthR","lengthL","conditionR","conditionL","bridgedual","lrp","lrp_next","_chainage_order"]].copy()
 
 
 def build_sourcesinks(df_roads):
-    """Create start and end rows (sourcesink) per road."""
-    df = df_roads.sort_values(["road", "chainage"]).reset_index(drop=True)
+    df = df_roads.sort_values(["road", "chainage"], kind="mergesort").reset_index(drop=True)
+    
+    # Get first and last row for each road.
     first = df.groupby("road").first().reset_index()
     last = df.groupby("road").last().reset_index()
 
+    # Create sourcesink rows for the start and end of each road.
     starts = pd.DataFrame(
         {
             "road": first["road"],
-            "id": first["road"].astype(str) + "_start",
+            "id": first["road"] + "_start",
             "model_type": "sourcesink",
             "name": first["road"],
             "lat": first["lat"],
             "lon": first["lon"],
             "length": 0,
             "condition": "",
+            "lengthR": pd.NA,
+            "lengthL": pd.NA,
+            "conditionR": pd.NA,
+            "conditionL": pd.NA,
+            "bridgedual": pd.NA,
+            "_chainage_order": first["chainage"] - 1e-6,
         }
     )
 
     ends = pd.DataFrame(
         {
             "road": last["road"],
-            "id": last["road"].astype(str) + "_end",
+            "id": last["road"] + "_end",
             "model_type": "sourcesink",
             "name": last["road"],
             "lat": last["lat"],
             "lon": last["lon"],
             "length": 0,
             "condition": "",
+            "lengthR": pd.NA,
+            "lengthL": pd.NA,
+            "conditionR": pd.NA,
+            "conditionL": pd.NA,
+            "bridgedual": pd.NA,
+            "_chainage_order": last["chainage"] + 1e-6,
         }
     )
 
     return starts, ends
 
 
-
 def merge_links(df_out):
-    """Merge consecutive 'link' segments in display order into a single link row."""
-    merged_rows = []
-    for road, group in df_out.groupby("road", sort=False):
-        # process rows in appearance order
-        acc = None
-        for _, row in group.iterrows():
-            if row["model_type"] != "link":
-                if acc is not None:
-                    merged_rows.append(acc)
-                    acc = None
-                merged_rows.append(row.to_dict())
-                continue
+    # Merge consecutive "link" segments on the same road into longer links.
+    # Bridges/ferries/sourcesinks are kept as-is.
+    work = df_out.copy()
+    # Preserve original global order so merged output can be restored consistently.
+    work["_order"] = np.arange(len(work))
 
-            # row is a link
-            if acc is None:
-                # start accumulating; ensure id/name follow requested format
-                acc = row.to_dict()
-                start_lrp = acc.get("lrp")
-                end_lrp = acc.get("lrp_next")
-                acc["id"] = f"{road}_{start_lrp}_{end_lrp}"
-                acc["name"] = acc["id"]
-                # coerce length to numeric
-                acc["length"] = float(acc.get("length") or 0)
-            else:
-                # merge any consecutive link rows (sequential in appearance)
-                end_lrp = row.get("lrp_next")
-                acc["id"] = f"{road}_{acc.get('lrp')}_{end_lrp}"
-                acc["name"] = acc["id"]
-                acc["length"] = float(acc.get("length") or 0) + float(row.get("length") or 0)
-                acc["lrp_next"] = end_lrp
+    # Identify link rows only.
+    is_link = work["model_type"].eq("link")
 
-        if acc is not None:
-            merged_rows.append(acc)
+    # Start a new run whenever a link row does not directly follow another link row on the same road.
+    run_start = is_link & (~is_link.groupby(work["road"]).shift(fill_value=False))
+    work["_run_id"] = run_start.groupby(work["road"]).cumsum()
+    work.loc[~is_link, "_run_id"] = pd.NA
 
-    df_new = pd.DataFrame(merged_rows)
-    # drop helper LRP columns if present
-    for c in ["lrp", "lrp_next"]:
-        if c in df_new.columns:
-            df_new = df_new.drop(columns=[c])
-    return df_new
-                
+    # Keep non-links untouched; only process link runs.
+    non_links = work.loc[~is_link].copy()
+    link_rows = work.loc[is_link].copy()
+
+    # Merge each run to one row: keep first row metadata, sum length, use last lrp_next.
+    if not link_rows.empty:
+        grouped = link_rows.groupby(["road", "_run_id"], sort=False, as_index=False)
+        first = grouped.first()
+        run_len = grouped.size().rename(columns={"size": "_run_len"})
+        length_sum = grouped["length"].sum(min_count=1).rename(columns={"length": "_length_sum"})
+        last_next = grouped.last()[["road", "_run_id", "lrp_next"]].rename(columns={"lrp_next": "_last_lrp_next"})
+
+        merged_links = first.merge(run_len, on=["road", "_run_id"], how="left")
+        merged_links = merged_links.merge(length_sum, on=["road", "_run_id"], how="left")
+        merged_links = merged_links.merge(last_next, on=["road", "_run_id"], how="left")
+        merged_links["length"] = merged_links["_length_sum"]
+        merged_links["lrp_next"] = np.where(merged_links["_run_len"] > 1, merged_links["_last_lrp_next"], merged_links["lrp_next"])
+
+        # Rebuild id/name only for rows that actually merged 2+ links.
+        multi = merged_links["_run_len"] > 1
+        merged_links.loc[multi, "id"] = merged_links.loc[multi, "road"] + "_" + merged_links.loc[multi, "lrp"] + "_" + merged_links.loc[multi, "lrp_next"]
+        merged_links.loc[multi, "name"] = merged_links.loc[multi, "id"]
+
+        merged_links = merged_links[work.columns]
+        out = pd.concat([non_links, merged_links], ignore_index=True, sort=False)
+    else:
+        out = work
+
+    # Restore original ordering and remove temporary helper columns.
+    out = out.sort_values("_order", kind="mergesort").reset_index(drop=True)
+    out = out.drop(columns=["_order", "_run_id", "lrp", "lrp_next"])
+    return out
+
 
 def main():
-    df_roads = pd.read_csv(roads_csv)
-    df_bmms = xlsx_tools.open_xlsx(bmms_xlsx)
+    # Load raw roads3 and BMMS inputs.
+    roads_raw = pd.read_csv(roads_csv)
+    bmms_raw = xlsx_tools.open_xlsx(bmms_xlsx)
+    print(f"Opened {roads_csv} and {bmms_xlsx}")
+
+    # Preprocess BMMS into roads3-like points, resolve duplicates, and prepare BMMS merge table.
+    roads_preprocessed, bmms_for_merge = preprocess_bmms.preprocess(roads_raw, bmms_raw)
+    print(f'Preprocessed roads and BMMS data')
     
-    segments = build_segments(df_roads, df_bmms)
-    starts, ends = build_sourcesinks(df_roads)
+    # Build simulation rows: start, segments, end.
+    segments = build_segments(roads_preprocessed, bmms_for_merge)
+    starts, ends = build_sourcesinks(roads_preprocessed)
 
     df_out = pd.concat([starts, segments, ends], ignore_index=True, sort=False)
-
-    # Optional: merge consecutive 'link' segments into a single link
-    if MERGE_CONSECUTIVE_LINKS:
-        df_out = merge_links(df_out)
-
-    #For instance keep N1
-    #df_out = df_out[df_out["road"] == "N1"]
+    df_out = df_out.sort_values(["road", "_chainage_order"], kind="mergesort").reset_index(drop=True)
     
-    #Assign road id correctly
+    # Merge links for efficiency.
+    df_out = merge_links(df_out)
+    print(f'Merged links')
+
+    # Finalize output IDs.
     df_out["name"] = df_out["id"]
-    road_group = df_out.groupby("road", sort=True)
-    road_number = road_group.ngroup() + 1
-    element_number = road_group.cumcount()
-    df_out["id"] = (road_number * 1_000_000 + element_number).astype("Int64")
+    df_out = assign_numeric_ids(df_out)
+
+    df_out = df_out.drop(columns=["_chainage_order"])
 
     df_out.to_csv(out_csv, index=False)
     print(f"Wrote {len(df_out)} rows to {out_csv}")
