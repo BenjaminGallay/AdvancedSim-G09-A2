@@ -11,9 +11,21 @@ def reset():
     return
 
 
-def bridge_delay_record(expected_mean_delay):
+def bridge_delay_record(length, condition, breakdown_probabilities):
+    if length < 10:
+        mean_delay = 15
+    elif length < 50:
+        mean_delay = 37.5
+    elif length < 200:
+        mean_delay = 67.5
+    else:
+        mean_delay = (
+            7 / 3
+        ) * 60  # expected value of the triangular distribution of probability
+    delay_probability = breakdown_probabilities[condition]
+
     global mean_travel_delay
-    mean_travel_delay += expected_mean_delay
+    mean_travel_delay += mean_delay * delay_probability
     return
 
 

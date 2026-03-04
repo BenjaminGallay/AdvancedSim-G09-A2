@@ -7,7 +7,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 ids = []
 travel_times = []
 frequencies = [0 for i in range(2000)]
-bridge_waited_time = [0 for i in range(125)]
+bridge_waited_time = [0 for i in range(446)]
 
 
 def reset_times():

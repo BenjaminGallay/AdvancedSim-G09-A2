@@ -1,4 +1,5 @@
 import statistics
+import time
 
 import matplotlib.pyplot as plt
 import numpy
@@ -46,7 +47,8 @@ choice_dict = {
 # run time 7200 ticks = 5*24h runtime
 run_length = 7200
 number_of_seeds = 10
-seeds = range(100, 100 + number_of_seeds)
+rand = int(1000000000 * time.time() % 1000000)
+seeds = range(rand, rand + number_of_seeds)
 
 
 def get_choice():
@@ -111,14 +113,6 @@ for scenario in scenarios:
             "\nBonus question --- Here are the bridges that have caused the most combined time delay"
         )
         for i in range(5):
-            # print(
-            #     i,
-            #     ": Bridge",
-            #     1000000 + worst_indexes[i],
-            #     "which caused delays of",
-            #     waited_times[i],
-            #     "ticks.",
-            # )
             print(
                 f"{i + 1}. Bridge {1000000 + worst_indexes[i]}, which caused a combined delay of {waited_times[i]} ticks."
             )

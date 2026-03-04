@@ -1,12 +1,25 @@
-from mesa.visualization.ModularVisualization import ModularServer
+from components import Bridge, Link, Sink, Source
 from ContinuousSpace.SimpleContinuousModule import SimpleCanvas
+from mesa.visualization.ModularVisualization import ModularServer
+
 from model import BangladeshModel
-from components import Source, Sink, Bridge, Link
 
 """
-Run simulation with Visualization 
+Run simulation with Visualization
 Print output at terminal
 """
+
+BREAKDOWN_PROBABILITIES = [
+    [0, 0, 0, 0],
+    [0, 0, 0, 0.05],
+    [0, 0, 0, 0.1],
+    [0, 0, 0.05, 0.1],
+    [0, 0, 0.1, 0.2],
+    [0, 0.05, 0.1, 0.2],
+    [0, 0.1, 0.2, 0.4],
+    [0.05, 0.1, 0.2, 0.4],
+    [0.1, 0.2, 0.4, 0.8],
+]
 
 
 # ---------------------------------------------------------------
@@ -23,7 +36,7 @@ def agent_portrayal(agent):
         "Shape": "circle",  # rect | circle
         "Filled": "true",
         "Color": "Khaki",
-        "r": 2
+        "r": 2,
         # "w": max(agent.population / 100000 * 4, 4),  # for "Shape": "rect"
         # "h": max(agent.population / 100000 * 4, 4)
     }
@@ -60,7 +73,7 @@ def agent_portrayal(agent):
 
 # ---------------------------------------------------------------
 """
-Launch the animation server Open a browser tab 
+Launch the animation server Open a browser tab
 """
 
 canvas_width = 400
@@ -68,10 +81,12 @@ canvas_height = 400
 
 space = SimpleCanvas(agent_portrayal, canvas_width, canvas_height)
 
-server = ModularServer(BangladeshModel,
-                       [space],
-                       "Transport Model Demo",
-                       {"seed": 1234567})
+server = ModularServer(
+    BangladeshModel,
+    [space],
+    "Transport Model Demo",
+    {"seed": 1234567, "breakdown_probabilities": BREAKDOWN_PROBABILITIES[0]},
+)
 
 # The default port
 server.port = 8521
