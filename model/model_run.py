@@ -113,14 +113,6 @@ for scenario in scenarios:
             "\nBonus question --- Here are the bridges that have caused the most combined time delay"
         )
         for i in range(5):
-            # print(
-            #     i,
-            #     ": Bridge",
-            #     1000000 + worst_indexes[i],
-            #     "which caused delays of",
-            #     waited_times[i],
-            #     "ticks.",
-            # )
             print(
                 f"{i + 1}. Bridge {1000000 + worst_indexes[i]}, which caused a combined delay of {waited_times[i]} ticks."
             )

@@ -152,22 +152,10 @@ class BangladeshModel(Model):
                     self.sources.append(agent.unique_id)
                     self.sinks.append(agent.unique_id)
                 elif model_type == "bridge":
-                    # computes the mean travel time analytically
-                    if row["length"] < 10:
-                        mean_delay = 15
-                    elif row["length"] < 50:
-                        mean_delay = 37.5
-                    elif row["length"] < 200:
-                        mean_delay = 67.5
-                    else:
-                        mean_delay = (
-                            (7 / 3) * 60
-                        )  # expected value of the triangular distribution of probability
-                    delay_probability = self.breakdown_probabilities[
-                        int(row["condition"])
-                    ]
                     analytical_recorder.bridge_delay_record(
-                        mean_delay * delay_probability
+                        row["length"],
+                        int(row["condition"]),
+                        self.breakdown_probabilities,
                     )
                     agent = Bridge(
                         row["id"],
