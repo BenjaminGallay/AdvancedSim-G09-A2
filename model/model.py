@@ -130,6 +130,7 @@ class BangladeshModel(Model):
 
         for df in df_objects_all:
             for _, row in df.iterrows():  # index, row in ...
+                # sends length data to the analytical recorder to compute the length of the road
                 analytical_recorder.road_length_record(row["length"])
                 # create agents according to model_type
                 model_type = row["model_type"]
@@ -152,6 +153,7 @@ class BangladeshModel(Model):
                     self.sources.append(agent.unique_id)
                     self.sinks.append(agent.unique_id)
                 elif model_type == "bridge":
+                    # sends data about the bridge to the analytical recoder fo the mean delay value computation
                     analytical_recorder.bridge_delay_record(
                         row["length"],
                         int(row["condition"]),
