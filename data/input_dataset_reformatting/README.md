@@ -30,7 +30,7 @@ This folder builds `data/roadN1.csv` from:
 
 # Methods
 
-Main entrypoint: `data/cleaned_dataset/fill_demo.py`.
+Main entrypoint: `data/input_dataset_reformatting/data_reformatting.py`.
 
 ## BMMS preprocessing details (`preprocess_bmms.py`)
 
@@ -61,7 +61,7 @@ Main entrypoint: `data/cleaned_dataset/fill_demo.py`.
 - Use BMMS `lat/lon` for the start point, and interpolate end `lat/lon` from roads geometry along chainage.
 - Carry bridge attributes (`condition`, `bridgedual`, etc) into generated points.
 
-## Segment construction (`fill_demo.py`)
+## Segment construction (`data_reformatting.py`)
 
 ### `build_segments`
 - Sort by `(road, chainage)` and generate `lrp_next`, `chainage_next`, `gap_next` with `shift(-1)`.
@@ -103,4 +103,3 @@ Main entrypoint: `data/cleaned_dataset/fill_demo.py`.
 ### `assign_numeric_ids`
 - Replace `id` with numeric id for model use:
   - `id = road_index * 1_000_000 + element_index`
-

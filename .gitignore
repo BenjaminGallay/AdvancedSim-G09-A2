@@ -1,5 +1,6 @@
 /model/__pycache__
 /model/ContinuousSpace/__pycache__
+data/input_dataset_reformatting/__pycache__
 /img/
 /data/.*
 *.pyc
